@@ -111,7 +111,33 @@ Click *Verify Server*, then sync. New attachments are picked up within `POLL_INT
 
 ## Connect an MCP client
 
-The search server speaks **streamable-HTTP** at `http://<host>:8000/mcp`. Add it as a custom/remote MCP server in your client. If `MCP_API_KEY` is set, the client must send it as `Authorization: Bearer <key>` (or `X-API-Key: <key>`).
+The search server speaks **streamable-HTTP** at `http://<host>:8000/mcp` (note the `/mcp` path). Add it as a custom/remote MCP server in your client. If `MCP_API_KEY` is set, present it as any of:
+
+- `Authorization: Bearer <key>` (best)
+- `X-API-Key: <key>`
+- `?key=<key>` in the URL — `http://<host>:8000/mcp?key=<key>` — for clients that only accept a plain URL (weakest; the key leaks into logs/proxies/history).
+
+### Claude.ai web (custom connector)
+
+To reach the server from Claude.ai on the public internet, expose **only** the MCP port with a TLS tunnel — [Tailscale](https://tailscale.com/kb/1223/funnel) Funnel is the easiest:
+
+```bash
+tailscale funnel --bg --https=443 8000     # public HTTPS 443 -> container :8000
+tailscale funnel status                    # prints https://<host>.<tailnet>.ts.net
+```
+
+Then in **Claude → Settings → Connectors → Add custom connector**, use the full URL **including `/mcp` and the key**:
+
+```
+https://<host>.<tailnet>.ts.net/mcp?key=<MCP_API_KEY>
+```
+
+Gotchas we hit, so you don't:
+
+- **The `/mcp` path is required.** Pointing at the bare host makes Claude POST to `/`, which 404s (`POST / … 404` in the logs). Add `/mcp` before the `?`.
+- **`404` vs `401`:** a `404` means the URL/path is wrong; a `401` means the key is wrong. A working connection logs `POST /mcp … 200`.
+- **OAuth caveat:** Claude.ai's web connector is built around the MCP **OAuth 2.1** flow for private data, so depending on the version it may attempt OAuth discovery (`GET /.well-known/oauth-protected-resource`) and refuse the plain URL-key approach. The `?key=` method is a pragmatic stopgap; the durable fix is real OAuth (e.g. a DCR-capable IdP like WorkOS AuthKit, or a Cloudflare Access MCP portal). See the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
+- **Don't Funnel the WebDAV port (8080).** Keep Zotero sync on your LAN/tailnet; only the MCP port needs to be public.
 
 ### Tools
 
@@ -126,7 +152,7 @@ The search server speaks **streamable-HTTP** at `http://<host>:8000/mcp`. Add it
 ## Security
 
 - The MCP HTTP transport is **unauthenticated unless you set `MCP_API_KEY`.** Without it, anyone who can reach `:8000` gets read access to your whole library.
-- The API key travels in a header, so it's only as private as the channel. Before exposing the server beyond localhost/LAN, put **TLS** in front — a reverse proxy (Caddy/nginx) or a tunnel (`cloudflared`) — which also gives you a second auth layer if you want one.
+- The key is only as private as the channel it rides on — especially via the `?key=` URL param, which lands in logs and history. Always put **TLS** in front before exposing the server beyond localhost/LAN (a tunnel like Tailscale/`cloudflared`, or a reverse proxy). The server is **read-only**, which caps the blast radius, but treat the key as low-value and rotate it freely.
 - The worker is the **single writer**; the MCP server never writes. Re-ingest is idempotent (etag-keyed), so duplicate or out-of-order events can't corrupt the index.
 
 ## Running without Docker
