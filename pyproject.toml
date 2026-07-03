@@ -1,0 +1,34 @@
+[project]
+name = "zdav"
+version = "0.2.0"
+description = "R2-backed Zotero section-ToC index: ingest worker + MCP search server"
+requires-python = ">=3.11"
+dependencies = [
+    "boto3>=1.34",
+    "docling>=2.0",
+    "lancedb>=0.15",
+    "pyarrow>=17",
+    "sentence-transformers>=3.0",
+    "mcp>=1.18",
+    "starlette>=0.37",
+    "uvicorn>=0.30",
+]
+
+[project.scripts]
+zdav-worker = "zdav_worker:main"       # ingest loop
+# the MCP server is launched via `uv run zdav_mcp.py` (stdio), not a console script
+
+[tool.hatch.build.targets.wheel]
+only-include = ["zdav_core.py", "zdav_worker.py", "zdav_mcp.py"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Optional: CPU-only torch to keep the venv small (bge-small runs fine on CPU).
+# [tool.uv.sources]
+# torch = { index = "pytorch-cpu" }
+# [[tool.uv.index]]
+# name = "pytorch-cpu"
+# url = "https://download.pytorch.org/whl/cpu"
+# explicit = true

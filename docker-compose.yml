@@ -1,0 +1,39 @@
+# Convenience wrapper: `docker compose up --build`.
+# Put the secrets in a .env file next to this (see the keys below).
+services:
+  zdav:
+    build: .
+    ports:
+      - "8080:8080"            # WebDAV endpoint for Zotero
+      - "8000:8000"            # remote MCP search server (/mcp)
+    environment:
+      # --- storage backend (used by the worker, MCP, AND the rclone remote) ---
+      #   s3://my-literature  -> R2 (needs the R2_* creds below)
+      #   /data/lit           -> local filesystem (mount it as a volume, below)
+      ZDAV_STORE: "${ZDAV_STORE:-s3://my-literature}"
+      # --- R2 creds (only needed when ZDAV_STORE is s3://…) ---
+      R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
+      R2_ACCESS_KEY_ID: "${R2_ACCESS_KEY_ID:-}"
+      R2_SECRET_ACCESS_KEY: "${R2_SECRET_ACCESS_KEY:-}"
+      # --- WebDAV auth Zotero connects with ---
+      WEBDAV_USER: "${WEBDAV_USER:-zotero}"
+      WEBDAV_PASS: "${WEBDAV_PASS}"
+      # --- MCP server (remote search) ---
+      MCP_TRANSPORT: "${MCP_TRANSPORT:-streamable-http}"
+      MCP_HOST: "${MCP_HOST:-0.0.0.0}"
+      MCP_PORT: "${MCP_PORT:-8000}"
+      MCP_API_KEY: "${MCP_API_KEY:-}"    # if set, required on every MCP request
+      # --- optional tuning ---
+      EMBED_MODEL: "${EMBED_MODEL:-BAAI/bge-small-en-v1.5}"
+      POLL_INTERVAL: "${POLL_INTERVAL:-60}"
+      DOCLING_TIMEOUT: "${DOCLING_TIMEOUT:-900}"
+    volumes:
+      - model-cache:/cache                        # ~1GB of downloaded models (managed)
+      # Local store, kept as plain files on the host (bind mount). With
+      # ZDAV_STORE=/data/lit, attachments/derived/lancedb/manifest all land in
+      # LIT_DATA_DIR on disk, browsable outside the container.
+      - ${LIT_DATA_DIR:-./lit-data}:/data/lit
+    restart: unless-stopped
+
+volumes:
+  model-cache:

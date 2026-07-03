@@ -1,0 +1,12 @@
+# secrets — never commit; .env.example is the tracked template
+.env
+.env.*
+!.env.example
+
+# python / uv
+.venv/
+__pycache__/
+*.pyc
+
+# local model caches
+cache/
