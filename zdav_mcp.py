@@ -24,15 +24,17 @@ Env:  same ZDAV_STORE/EMBED_ vars as the worker (via zdav_core). No docling need
       MCP_API_KEY (optional; if set, every HTTP request must present it)
 pip:  mcp  (plus zdav_core's deps: boto3 lancedb sentence-transformers pyarrow)
 
-Security: set MCP_API_KEY to require a shared key on every request (sent as
-'Authorization: Bearer <key>' or 'X-API-Key: <key>'). Without it the HTTP
-transport is UNAUTHENTICATED and exposes read access to the whole library — in
-that case keep it on a trusted network or behind a tunnel/reverse proxy. Either
-way, use TLS (a proxy/tunnel) before exposing it beyond localhost, since the key
-travels in a header.
+Security: set MCP_API_KEY to require a shared key on every request. Send it as
+'Authorization: Bearer <key>', 'X-API-Key: <key>', or — for clients that only
+take a plain URL — as a query param: http://HOST:PORT/mcp?key=<key>. The URL
+param is the least secure (query strings leak into logs, proxies, and browser
+history), so prefer a header where you can. Without any key the HTTP transport
+is UNAUTHENTICATED and exposes read access to the whole library. Either way, use
+TLS (a proxy/tunnel) before exposing it beyond localhost.
 """
 from __future__ import annotations
 import hmac, os
+from urllib.parse import parse_qs
 
 from mcp.server.fastmcp import FastMCP
 
@@ -136,20 +138,30 @@ def get_document_text(zotero_key: str) -> str:
     return store.get(sorted(mds)[-1]).decode("utf-8")
 
 class ApiKeyMiddleware:
-    """Reject requests that don't present the shared key — as `Authorization:
-    Bearer <key>` or an `X-API-Key: <key>` header. Pure ASGI, so it wraps the
-    FastMCP app with no extra machinery. Constant-time compare avoids leaking
-    the key via response timing."""
+    """Reject requests that don't present the shared key. Accepts it three ways,
+    in order of preference:
+        Authorization: Bearer <key>   (best)
+        X-API-Key: <key>
+        ?key=<key>  or  ?api_key=<key>   (URL param — convenient but weaker:
+            query strings land in access logs, proxies, and browser history)
+    Pure ASGI so it wraps the FastMCP app with no extra machinery. Constant-time
+    compare avoids leaking the key via response timing."""
     def __init__(self, app, api_key: str):
         self.app, self.api_key = app, api_key
 
+    def _token(self, scope) -> str:
+        h = dict(scope.get("headers", []))
+        auth = h.get(b"authorization", b"").decode()
+        if auth[:7].lower() == "bearer ":
+            return auth[7:]
+        if b"x-api-key" in h:
+            return h[b"x-api-key"].decode()
+        qs = parse_qs(scope.get("query_string", b"").decode())
+        return (qs.get("key") or qs.get("api_key") or [""])[0]
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
-            h = dict(scope.get("headers", []))
-            auth = h.get(b"authorization", b"").decode()
-            token = (auth[7:] if auth[:7].lower() == "bearer "
-                     else h.get(b"x-api-key", b"").decode())
-            if not hmac.compare_digest(token, self.api_key):
+            if not hmac.compare_digest(self._token(scope), self.api_key):
                 from starlette.responses import PlainTextResponse
                 await PlainTextResponse("unauthorized", status_code=401)(scope, receive, send)
                 return
