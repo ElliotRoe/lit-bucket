@@ -20,7 +20,7 @@
 Everything runs in **one Docker container**, backed by either **Cloudflare R2** or a **local filesystem**. 
 
 > [!NOTE]
-> If you're university-affiliated / non-commercial and looking for a turnkey free hosted storage & search solution, submit your email [here](litbucket.dev), and I can provision you a reasonable amount of storage on my homelab infrastructure. If you're looking to self-host something more scalable yourself, just reach out to help@litbucket.dev (this is just an alias to my personal email) and happy to help walk you through it.
+> If you're university-affiliated / non-commercial and looking for a turnkey free hosted storage & search solution, submit your email [here](https://litbucket.dev), and I can provision you a reasonable amount of storage on my homelab infrastructure. If you're looking to self-host something more scalable yourself, just reach out to help@litbucket.dev (this is just an alias to my personal email) and happy to help walk you through it.
 
 ## How it works
 
