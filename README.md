@@ -2,10 +2,10 @@
   <img src="Bucket%20-%20Logo.svg" alt="lit-bucket logo" width="140" height="140">
 </p>
 
-<h1 align="center">lit-bucket</h1>
+<h1 align="center">Lit Bucket</h1>
 
 <p align="center">
-  <em>An infinitely scalable research library for AI agents, backed by S3.</em>
+  <em>An infinitely scalable research library storage & search for AI agents, backed by S3.</em>
 </p>
 
 <p align="center">
@@ -15,26 +15,29 @@
 
 ---
 
-**lit-bucket** turns the papers in your Zotero library into a searchable knowledge base for AI assistants. It watches the attachments Zotero syncs over WebDAV, parses each PDF to Markdown **on-device** with [Docling](https://github.com/DS4SD/docling), and builds a section-level table-of-contents index (vector + full-text) in [LanceDB](https://lancedb.com/). A remote **MCP server** then lets a client like Claude search that index and pull the full text of any paper.
+**Lit Bucket** turns the papers in your Zotero library into a searchable knowledge base for AI assistants. It watches the attachments Zotero syncs over WebDAV, parses each PDF to Markdown **on-device** with [Docling](https://github.com/DS4SD/docling), and builds a section-level table-of-contents index (vector + full-text) in [LanceDB](https://lancedb.com/). A remote **MCP server** then lets a client like Claude search that index and pull the full text of any paper.
 
-Everything runs in **one Docker container**, backed by either **Cloudflare R2** or a **local filesystem** — your choice, one setting.
+Everything runs in **one Docker container**, backed by either **Cloudflare R2** or a **local filesystem**. 
+
+> [!NOTE]
+> If you're university-affiliated / non-commercial and looking for a turnkey free hosted storage & search solution, submit your email [here](litbucket.dev), and I can provision you a reasonable amount of storage on my homelab infrastructure. If you're looking to self-host something more scalable yourself, just reach out to help@litbucket.dev (this is just an alias to my personal email) and happy to help walk you through it.
 
 ## How it works
 
 ```
-                 ┌──────────────────────── one container ────────────────────────┐
-   Zotero ──WebDAV──▶  rclone (:8080)                                             │
+                 ┌──────────────────────── one container ──────────────────────────┐
+   Zotero ──WebDAV──▶  rclone (:8080)                                              │
                  │        │  writes .zip/.prop                                     │
                  │        ▼                                                        │
-                 │   ┌─────────┐   poll    ┌───────────────┐   embed   ┌────────┐ │
-                 │   │  STORE  │◀──────────│ ingest worker │──────────▶│ LanceDB│ │
-                 │   │ (R2 or  │  PDF ───▶ │  Docling → md │  upsert   │  index │ │
-                 │   │  local) │           └───────────────┘           └────────┘ │
+                 │   ┌─────────┐   poll    ┌───────────────┐   embed   ┌────────┐  │
+                 │   │  STORE  │◀──────────│ ingest worker │──────────▶│ LanceDB│  │
+                 │   │ (R2 or  │  PDF ───▶ │  Docling → md │  upsert   │  index │  │
+                 │   │  local) │           └───────────────┘           └────────┘  │
                  │   └─────────┘                                            ▲      │
                  │        ▲                                                 │read  │
-   MCP client ──HTTP──▶ MCP server (:8000) ─────────────────────────────────┘     │
-   (Claude, …)   │      semantic / fulltext / hybrid search + full-text fetch     │
-                 └───────────────────────────────────────────────────────────────┘
+   MCP client ──HTTP──▶ MCP server (:8000) ─────────────────────────────────┘      │
+   (Claude, …)   │      semantic / fulltext / hybrid search + full-text fetch      │
+                 └─────────────────────────────────────────────────────────────────┘
 ```
 
 1. **rclone** serves a WebDAV endpoint that Zotero syncs its file attachments into (`attachments/<key>.zip`).
