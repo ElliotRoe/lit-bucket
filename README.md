@@ -5,7 +5,7 @@
 <h1 align="center">Lit Bucket</h1>
 
 <p align="center">
-  <em>An infinitely scalable research library storage & search for AI agents, backed by S3.</em>
+  <em>Infinitely scalable research library storage & search for AI agents, backed by S3.</em>
 </p>
 
 <p align="center">
